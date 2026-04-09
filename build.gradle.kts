@@ -29,6 +29,14 @@ kotlin {
     jvmToolchain(17)
 }
 
+intellijPlatform {
+    pluginVerification {
+        ides {
+            recommended()
+        }
+    }
+}
+
 tasks {
     wrapper {
         gradleVersion = "8.9"
