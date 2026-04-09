@@ -4,6 +4,7 @@ import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.process.OSProcessHandler
 import com.intellij.execution.process.ProcessAdapter
 import com.intellij.execution.process.ProcessEvent
+import com.intellij.execution.process.ProcessOutputTypes
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.AnAction
@@ -17,10 +18,6 @@ import com.intellij.openapi.util.Key
 import com.sidenotes.SidenotesBundle
 import com.sidenotes.services.AnnotationService
 
-/**
- * Action that runs `bundle exec rake sidenotes:generate` in the project root
- * to regenerate annotation YAML files. Available via Tools menu.
- */
 class RegenerateAnnotationsAction : AnAction() {
 
     private val log = Logger.getInstance(RegenerateAnnotationsAction::class.java)
@@ -36,23 +33,20 @@ class RegenerateAnnotationsAction : AnAction() {
             override fun run(indicator: ProgressIndicator) {
                 indicator.isIndeterminate = true
                 indicator.text = SidenotesBundle.message("action.regenerate.progress")
-
-                runGenerate(project, indicator)
+                runGenerate(project)
             }
         })
     }
 
     override fun update(e: AnActionEvent) {
-        // Only enable if a project is open
         e.presentation.isEnabledAndVisible = e.project != null
     }
 
-    private fun runGenerate(project: Project, indicator: ProgressIndicator) {
+    private fun runGenerate(project: Project) {
         val projectPath = project.basePath ?: return
 
         val commandLine = GeneralCommandLine("bundle", "exec", "rake", "sidenotes:generate")
             .withWorkDirectory(projectPath)
-            .withEnvironment(System.getenv())
 
         try {
             val handler = OSProcessHandler(commandLine)
@@ -61,11 +55,10 @@ class RegenerateAnnotationsAction : AnAction() {
 
             handler.addProcessListener(object : ProcessAdapter() {
                 override fun onTextAvailable(event: ProcessEvent, outputType: Key<*>) {
-                    val text = event.text
-                    if (outputType.toString() == "stderr") {
-                        errors.append(text)
+                    if (outputType === ProcessOutputTypes.STDERR) {
+                        errors.append(event.text)
                     } else {
-                        output.append(text)
+                        output.append(event.text)
                     }
                 }
             })
@@ -76,9 +69,7 @@ class RegenerateAnnotationsAction : AnAction() {
             val exitCode = handler.exitCode ?: -1
 
             if (exitCode == 0) {
-                // Refresh the annotation cache
                 AnnotationService.getInstance(project).invalidateAll()
-
                 notify(
                     project,
                     SidenotesBundle.message("action.regenerate.success"),

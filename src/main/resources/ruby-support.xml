@@ -1,10 +1,4 @@
-<!-- Optional Ruby plugin integration -->
 <idea-plugin>
     <extensions defaultExtensionNs="com.intellij">
-        <!--
-            When the Ruby plugin is available (RubyMine or IntelliJ + Ruby plugin),
-            we can use Ruby-specific PSI for better class resolution.
-            For now, the base providers work with any language via text pattern matching.
-        -->
     </extensions>
 </idea-plugin>

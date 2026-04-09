@@ -6,14 +6,12 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.sidenotes.models.*
+import org.yaml.snakeyaml.LoaderOptions
 import org.yaml.snakeyaml.Yaml
+import org.yaml.snakeyaml.constructor.SafeConstructor
 import java.io.StringReader
 import java.util.concurrent.ConcurrentHashMap
 
-/**
- * Project-level service that manages loading, caching, and querying
- * annotation data from .annotations/*.yml files.
- */
 @Service(Service.Level.PROJECT)
 class AnnotationService(private val project: Project) {
 
@@ -22,6 +20,7 @@ class AnnotationService(private val project: Project) {
 
     companion object {
         private const val ANNOTATIONS_DIR = ".annotations"
+        private val YAML_EXTENSIONS = listOf("yml", "yaml")
 
         @JvmStatic
         fun getInstance(project: Project): AnnotationService =
@@ -29,14 +28,13 @@ class AnnotationService(private val project: Project) {
     }
 
     /**
-     * Resolves a model file path to its annotation file.
-     * Supports namespaced models: app/models/admin/user.rb → .annotations/admin/user.yml
+     * Resolves a model file path to its annotation.
+     * Supports namespaced models: app/models/admin/user.rb -> .annotations/admin/user.yml
      */
     fun getAnnotationForModelFile(modelFile: VirtualFile): AnnotationData? {
         val projectBase = project.basePath ?: return null
         val modelPath = modelFile.path
 
-        // Extract relative path from app/models/
         val modelsPrefix = "$projectBase/app/models/"
         if (!modelPath.startsWith(modelsPrefix)) return null
 
@@ -46,10 +44,6 @@ class AnnotationService(private val project: Project) {
         return getAnnotation(annotationName)
     }
 
-    /**
-     * Gets annotation data by model name (e.g., "user" or "admin/user").
-     * Loads from cache or parses from file.
-     */
     fun getAnnotation(modelName: String): AnnotationData? {
         cache[modelName]?.let { return it }
 
@@ -58,29 +52,17 @@ class AnnotationService(private val project: Project) {
         return data
     }
 
-    /**
-     * Returns all currently cached annotations.
-     */
     fun getAllAnnotations(): Map<String, AnnotationData> = cache.toMap()
 
-    /**
-     * Invalidates the cache for a specific model name.
-     */
     fun invalidate(modelName: String) {
         cache.remove(modelName)
     }
 
-    /**
-     * Clears the entire annotation cache and reloads from disk.
-     */
     fun invalidateAll() {
         cache.clear()
         preloadAnnotations()
     }
 
-    /**
-     * Scans the .annotations directory and preloads all YAML files.
-     */
     fun preloadAnnotations() {
         val projectBase = project.basePath ?: return
         val annotationsDir = LocalFileSystem.getInstance()
@@ -94,7 +76,7 @@ class AnnotationService(private val project: Project) {
             if (child.isDirectory) {
                 val newPrefix = if (prefix.isEmpty()) child.name else "$prefix/${child.name}"
                 loadAnnotationsRecursive(child, newPrefix)
-            } else if (child.extension == "yml" || child.extension == "yaml") {
+            } else if (child.extension in YAML_EXTENSIONS) {
                 val modelName = if (prefix.isEmpty()) {
                     child.nameWithoutExtension
                 } else {
@@ -114,22 +96,26 @@ class AnnotationService(private val project: Project) {
 
     private fun loadAnnotationFile(modelName: String): AnnotationData? {
         val projectBase = project.basePath ?: return null
-        val filePath = "$projectBase/$ANNOTATIONS_DIR/$modelName.yml"
+        val fs = LocalFileSystem.getInstance()
 
-        val file = LocalFileSystem.getInstance().findFileByPath(filePath) ?: return null
+        // Try both .yml and .yaml extensions
+        val file = YAML_EXTENSIONS.firstNotNullOfOrNull { ext ->
+            fs.findFileByPath("$projectBase/$ANNOTATIONS_DIR/$modelName.$ext")
+        } ?: return null
 
         return try {
             val content = String(file.contentsToByteArray())
             parseYaml(content)
         } catch (e: Exception) {
-            log.warn("Failed to load annotation file: $filePath", e)
+            log.warn("Failed to load annotation file: ${file.path}", e)
             null
         }
     }
 
     @Suppress("UNCHECKED_CAST")
     internal fun parseYaml(content: String): AnnotationData? {
-        val yaml = Yaml()
+        // SafeConstructor restricts deserialization to basic types only, preventing RCE
+        val yaml = Yaml(SafeConstructor(LoaderOptions()))
         val data: Map<String, Any> = yaml.load(StringReader(content)) ?: return null
 
         val tableName = data["table_name"] as? String ?: return null
@@ -171,14 +157,14 @@ class AnnotationService(private val project: Project) {
     }
 
     /**
-     * Resolves a model class name (e.g., "User" or "Admin::User") to its annotation.
+     * Converts a CamelCase class name to a snake_case model path.
+     * Handles acronyms: "Admin::User" -> "admin/user", "APIKey" -> "api_key"
      */
     fun getAnnotationForClassName(className: String): AnnotationData? {
-        // Convert CamelCase class name to snake_case file name
-        // Admin::User → admin/user
         val modelName = className
             .replace("::", "/")
-            .replace(Regex("([a-z])([A-Z])")) { "${it.groupValues[1]}_${it.groupValues[2]}" }
+            .replace(Regex("([A-Z]+)([A-Z][a-z])")) { "${it.groupValues[1]}_${it.groupValues[2]}" }
+            .replace(Regex("([a-z\\d])([A-Z])")) { "${it.groupValues[1]}_${it.groupValues[2]}" }
             .lowercase()
 
         return getAnnotation(modelName)

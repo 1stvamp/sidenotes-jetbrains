@@ -1,9 +1,11 @@
 package com.sidenotes.toolwindow
 
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.components.JBScrollPane
@@ -16,15 +18,10 @@ import javax.swing.JPanel
 import javax.swing.JTextArea
 import javax.swing.SwingUtilities
 
-/**
- * Creates the "Sidenotes" tool window panel that displays the full schema
- * for the currently active model file. Updates automatically when the user
- * switches between editor tabs.
- */
 class SchemaToolWindowFactory : ToolWindowFactory {
 
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
-        val panel = SchemaToolWindowPanel(project)
+        val panel = SchemaToolWindowPanel(project, toolWindow.disposable)
 
         val content = ContentFactory.getInstance().createContent(
             panel,
@@ -37,11 +34,10 @@ class SchemaToolWindowFactory : ToolWindowFactory {
     override fun shouldBeAvailable(project: Project): Boolean = true
 }
 
-/**
- * The main panel displayed inside the Sidenotes tool window.
- * Shows schema information in a monospaced text area.
- */
-class SchemaToolWindowPanel(private val project: Project) : JPanel(BorderLayout()) {
+class SchemaToolWindowPanel(
+    private val project: Project,
+    parentDisposable: Disposable
+) : JPanel(BorderLayout()) {
 
     private val textArea = JTextArea().apply {
         isEditable = false
@@ -56,8 +52,8 @@ class SchemaToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
     init {
         add(JBScrollPane(textArea), BorderLayout.CENTER)
 
-        // Listen for editor tab changes
-        project.messageBus.connect().subscribe(
+        val connection = project.messageBus.connect(parentDisposable)
+        connection.subscribe(
             FileEditorManagerListener.FILE_EDITOR_MANAGER,
             object : FileEditorManagerListener {
                 override fun selectionChanged(event: FileEditorManagerEvent) {
@@ -66,27 +62,18 @@ class SchemaToolWindowPanel(private val project: Project) : JPanel(BorderLayout(
             }
         )
 
-        // Show content for currently open file
         updateContent()
     }
 
     private fun updateContent() {
-        val editor = FileEditorManager.getInstance(project)
-        val currentFile = editor.selectedFiles.firstOrNull()
+        val currentFile = FileEditorManager.getInstance(project).selectedFiles.firstOrNull()
 
-        if (currentFile == null) {
+        if (currentFile == null || currentFile.extension != "rb") {
             textArea.text = emptyMessage
             return
         }
 
-        // Check if this is a Ruby model file
-        if (currentFile.extension != "rb") {
-            textArea.text = emptyMessage
-            return
-        }
-
-        val service = AnnotationService.getInstance(project)
-        val annotation = service.getAnnotationForModelFile(currentFile)
+        val annotation = AnnotationService.getInstance(project).getAnnotationForModelFile(currentFile)
 
         if (annotation != null) {
             textArea.text = annotation.toPlainText()
