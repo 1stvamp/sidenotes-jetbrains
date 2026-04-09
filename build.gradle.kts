@@ -19,6 +19,7 @@ dependencies {
         intellijIdeaUltimate("2024.1")
         bundledPlugin("org.jetbrains.plugins.ruby")
         pluginVerifier()
+        zipSigner()
         instrumentationTools()
     }
 
@@ -37,5 +38,15 @@ tasks {
     patchPluginXml {
         sinceBuild.set("241")
         untilBuild.set("251.*")
+    }
+
+    signPlugin {
+        certificateChain.set(System.getenv("CERTIFICATE_CHAIN"))
+        privateKey.set(System.getenv("PRIVATE_KEY"))
+        password.set(System.getenv("PRIVATE_KEY_PASSWORD"))
+    }
+
+    publishPlugin {
+        token.set(System.getenv("PUBLISH_TOKEN"))
     }
 }
