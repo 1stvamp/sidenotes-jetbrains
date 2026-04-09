@@ -17,7 +17,6 @@ repositories {
 dependencies {
     intellijPlatform {
         intellijIdeaUltimate("2024.1")
-        bundledPlugin("org.jetbrains.plugins.ruby")
         pluginVerifier()
         zipSigner()
         instrumentationTools()
