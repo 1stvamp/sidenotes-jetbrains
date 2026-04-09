@@ -2,7 +2,7 @@
 <idea-plugin>
     <id>com.sidenotes.jetbrains</id>
     <name>Rails Sidenotes</name>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
     <vendor email="wes@wesmason.com" url="https://github.com/wesmason">Wes Mason</vendor>
 
     <description><![CDATA[
