@@ -10,26 +10,29 @@ import com.intellij.psi.PsiElement
 import com.intellij.ui.awt.RelativePoint
 import com.sidenotes.SidenotesBundle
 import com.sidenotes.services.AnnotationService
+import com.sidenotes.services.SidenotesSettings
 import java.awt.event.MouseEvent
 import javax.swing.Icon
 
 class SchemaLineMarkerProvider : LineMarkerProvider {
 
     companion object {
-        private val CLASS_PATTERN = Regex(
-            """^\s*class\s+(\w+(?:::\w+)*)\s*<\s*(?:ApplicationRecord|ActiveRecord::Base)\s*$"""
-        )
+        // Broad class detection — any Ruby class, annotation lookup determines relevance
+        private val CLASS_PATTERN = Regex("""^\s*class\s+([\w:]+)\s*(?:<\s*[\w:]+)?\s*$""")
         private val ICON: Icon = AllIcons.Providers.Mysql
     }
 
     override fun getLineMarkerInfo(element: PsiElement): LineMarkerInfo<*>? {
         if (element.containingFile?.virtualFile?.extension != "rb") return null
 
+        val settings = SidenotesSettings.getInstance(element.project)
+        if (!settings.showGutterIcons) return null
+
         val document = element.containingFile?.viewProvider?.document ?: return null
         val lineNumber = document.getLineNumber(element.textRange.startOffset)
         val lineStart = document.getLineStartOffset(lineNumber)
 
-        // Only process the first non-whitespace element on each line to avoid duplicates
+        // Only process the first non-whitespace element on each line
         if (element.textRange.startOffset != lineStart) {
             val textBefore = document.getText(TextRange(lineStart, element.textRange.startOffset))
             if (textBefore.isNotBlank()) return null

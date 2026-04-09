@@ -43,10 +43,11 @@ class RegenerateAnnotationsAction : AnAction() {
     }
 
     private fun runGenerate(project: Project) {
-        val projectPath = project.basePath ?: return
+        // Run in the detected Rails root, not project root
+        val railsRoot = AnnotationService.getInstance(project).getRailsRoot()
 
         val commandLine = GeneralCommandLine("bundle", "exec", "rake", "sidenotes:generate")
-            .withWorkDirectory(projectPath)
+            .withWorkDirectory(railsRoot)
 
         try {
             val handler = OSProcessHandler(commandLine)

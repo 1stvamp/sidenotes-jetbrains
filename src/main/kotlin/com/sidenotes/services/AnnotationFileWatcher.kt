@@ -22,8 +22,9 @@ class AnnotationFileWatcher : ProjectActivity {
             VirtualFileManager.VFS_CHANGES,
             object : BulkFileListener {
                 override fun after(events: MutableList<out VFileEvent>) {
-                    val projectBase = project.basePath ?: return
-                    val annotationsPrefix = "$projectBase/.annotations/"
+                    val railsRoot = service.getRailsRoot()
+                    val annotationsDir = service.getAnnotationsDir()
+                    val annotationsPrefix = "$railsRoot/$annotationsDir/"
 
                     for (event in events) {
                         val path = event.path ?: continue

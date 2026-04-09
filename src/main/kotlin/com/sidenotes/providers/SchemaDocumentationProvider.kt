@@ -9,9 +9,8 @@ import com.sidenotes.services.AnnotationService
 class SchemaDocumentationProvider : AbstractDocumentationProvider() {
 
     companion object {
-        private val CLASS_DEF_PATTERN = Regex(
-            """class\s+(\w+(?:::\w+)*)\s*<\s*(?:ApplicationRecord|ActiveRecord::Base)"""
-        )
+        // Broad class detection
+        private val CLASS_DEF_PATTERN = Regex("""class\s+([\w:]+)\s*(?:<\s*[\w:]+)?""")
         private val CLASS_REF_PATTERN = Regex("""^[A-Z]\w*(?:::\w+)*$""")
     }
 
