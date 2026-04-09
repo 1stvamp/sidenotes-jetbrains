@@ -9,6 +9,7 @@ out/
 .gradle/
 build/
 !gradle/wrapper/
+.intellijPlatform/
 
 # OS
 .DS_Store
