@@ -27,6 +27,7 @@ jobs:
         run: ./gradlew buildPlugin
 
       - name: Sign plugin
+        if: secrets.CERTIFICATE_CHAIN != ''
         run: ./gradlew signPlugin
         env:
           CERTIFICATE_CHAIN: ${{ secrets.CERTIFICATE_CHAIN }}
